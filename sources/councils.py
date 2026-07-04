@@ -55,17 +55,67 @@ def scrape(council):
                 ttype = c
                 break
 
-        tenders[uid] = Tender(
+        t = Tender(
             uid=uid,
             source=council["name"],
             title=title,
             url=urljoin(council["url"], href),
+            publisher=council["name"],
             ttype=ttype,
             open_date=open_date,
             close_date=close_date,
         )
 
+        # תבנית B (עמק יזרעאל/מגידו): הפרטים בפאנל פנימי באותו עמוד — חינם
+        if href.startswith("#"):
+            _fill_from_panel(t, soup, href.lstrip("#"))
+
+        tenders[uid] = t
+
     return list(tenders.values())
+
+
+_EMAIL_RE = re.compile(r"[\w.\-]+@[\w.\-]+\.\w{2,}")
+_PHONE_RE = re.compile(r"0\d[-\s]?\d{6,7}")
+
+
+def _fill_from_panel(tender, soup, panel_id):
+    """מחלץ תיאור/מספר/יצירת קשר מהפאנל הפנימי (תבנית עמק יזרעאל)."""
+    panel = soup.find(id=panel_id)
+    if not panel:
+        return
+    text = re.sub(r"\s+", " ", panel.get_text(" ", strip=True))
+    tender.number = _grab(r"מספר מכרז:?\s*([\w/]+)", text)
+    tender.terms = _grab(r"תאור המכרז:?\s*(.{5,180}?)(?:תאריך|מועד|לצפייה|$)", text) \
+        or _grab(r"תאור המשרה:?\s*(.{5,180}?)(?:תאריך|מועד|$)", text)
+    tender.contact_email = _grab_re(_EMAIL_RE, text)
+    tender.contact_phone = _grab_re(_PHONE_RE, text)
+
+
+def enrich_match(tender):
+    """השלמת פרטים למכרז תואם מתבנית A (הגלבוע) — עמוד ?id= נפרד."""
+    if "?id=" not in tender.url:
+        return
+    html = get_html(tender.url)
+    if not html:
+        return
+    panel = BeautifulSoup(html, "html.parser").select_one(
+        ".bid-content, .content-bid, main, article") or BeautifulSoup(html, "html.parser")
+    text = re.sub(r"\s+", " ", panel.get_text(" ", strip=True))
+    if not tender.contact_email:
+        tender.contact_email = _grab_re(_EMAIL_RE, text)
+    if not tender.contact_phone:
+        tender.contact_phone = _grab_re(_PHONE_RE, text)
+
+
+def _grab(pattern, text):
+    m = re.search(pattern, text)
+    return m.group(1).strip() if m else ""
+
+
+def _grab_re(rx, text):
+    m = rx.search(text)
+    return m.group(0).strip() if m else ""
 
 
 def scrape_all(councils):

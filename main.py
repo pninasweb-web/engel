@@ -26,9 +26,10 @@ def collect_council_matches(seen, processed):
         if t.uid in seen:
             continue
         processed.add(t.uid)
-        b = classify.bucket(t.title)
+        b = classify.bucket(f"{t.title} {t.terms}")
         if b:
             t.bucket = b
+            councils.enrich_match(t)   # השלמת יצירת קשר למכרז תואם
             matches.append(t)
     return matches
 
@@ -46,7 +47,7 @@ def collect_mr_gov_matches(seen, processed):
 
     for t in capped:
         processed.add(t.uid)
-        mr_gov.enrich_location(t)
+        mr_gov.enrich_details(t)
         # סינון אזור לפי היישוב שחולץ + הכותרת (לא לפי טקסט הנכס הרחב,
         # כדי לא לתפוס יישובים רחוקים שנכללים באותה עסקה)
         if not classify.in_region(f"{t.location} {t.title}"):
@@ -70,6 +71,12 @@ def main(dry_run=False):
     print(f"\nנמצאו {len(matches)} מכרזים חדשים ורלוונטיים.")
     for t in matches:
         print(f"  [{t.bucket}] {t.source} · {t.location or '—'} · {t.title[:70]}")
+
+    if "--preview" in sys.argv:
+        with open("email_preview.html", "w", encoding="utf-8") as f:
+            f.write(notify.build_html(matches))
+        print("\nנשמרה תצוגה מקדימה: email_preview.html (לא נשלח מייל ולא נשמר מצב)")
+        return
 
     if dry_run:
         print("\n(dry-run: לא נשלח מייל ולא נשמר מצב)")

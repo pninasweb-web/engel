@@ -31,7 +31,7 @@ def _parse_results(html):
         link = head.find_parent("a")
         if not link:
             continue
-        title = head.get_text(strip=True)
+        title = re.sub(r"\s+", " ", head.get_text(strip=True))
         href = link.get("href", "")
         url = urljoin(MR_GOV_BASE, href)
         pub_id = href.rstrip("/").split("/")[-1]
@@ -83,21 +83,41 @@ def search_candidates():
     return found
 
 
-def enrich_location(tender):
-    """קורא את דף הפרט ומחלץ יישוב + טקסט רלוונטי לסינון גאוגרפי."""
+def _grab(pattern, text, group=1):
+    m = re.search(pattern, text)
+    return m.group(group).strip() if m else ""
+
+
+def enrich_details(tender):
+    """קורא את דף הפרט ומחלץ את כל הנתונים המפורטים למייל."""
     html = get_html(tender.url)
     if not html:
         return
     text = re.sub(r"<[^>]+>", " ", html)
+    text = re.sub(r"&nbsp;?", " ", text)
     text = re.sub(r"\s+", " ", text)
 
-    # שם היישוב מופיע כ"בישוב: X" ונעצר לפני "תקנת/פטור/גוש/מס׳"
-    m = re.search(r"בישוב:\s*([^\d,|]{2,40}?)\s*(?:תקנ|פטור|גוש|הענק|מס['׳]|$)", text)
-    if m:
-        tender.location = m.group(1).strip()
+    # יישוב — נעצר לפני "תקנת/פטור/גוש/מס׳"
+    tender.location = _grab(
+        r"בישוב:\s*([^\d,|]{2,40}?)\s*(?:תקנ|פטור|גוש|הענק|מס['׳]|$)", text)
 
-    # חלון טקסט סביב פרטי הנכס — לתצוגה בלבד, לא לסינון האזור
-    idx = text.find("בישוב")
-    if idx < 0:
-        idx = text.find("גוש")
-    tender.extra_text = text[max(0, idx - 60):idx + 200] if idx >= 0 else ""
+    # תאריכים
+    tender.open_date = _grab(r"תאריך פרסום:\s*(\d{2}/\d{2}/\d{4})", text)
+    deadline = _grab(r"מועד אחרון להגשה:\s*([^|]{0,60}?)\s*(?:איש קשר|פרטי|תקנ|$)", text)
+    # מציגים מועד אחרון רק אם הוא מכיל תאריך אמיתי (לא "השגות")
+    tender.close_date = deadline if re.search(r"\d{2}/\d{2}/\d{4}", deadline) else ""
+
+    # מהות ההתקשרות = התנאים/התיאור (מנקים מספרי רישום ארוכים שמלכלכים)
+    terms = _grab(r"מהות ההתקשרות:\s*([^,]{3,80})", text)
+    terms = re.sub(r"\s*\d{6,}\s*", " ", terms).strip()
+    tender.terms = terms
+
+    # שטח וגוש/חלקה
+    tender.area = _grab(r"שטח עיסקה:\s*([\d,]+)", text)
+    tender.parcel = _grab(r"בגוש חלקה ושיטת רישום\s*([^|]{3,60}?)(?:בישוב|במגרש|תכנית|$)", text)
+
+    # יצירת קשר
+    tender.contact_name = _grab(r"איש קשר:\s*([^\d]{2,40}?)\s*(?:דוא|טלפון|מייל|$)", text)
+    tender.contact_email = _grab(r"([\w.\-]+@[\w.\-]+\.\w{2,})", text)
+    # טלפון רק כשמסומן במפורש (אחרת יש רעש ממספרי תכנית)
+    tender.contact_phone = _grab(r"טלפון:?\s*(0\d[-\s]?\d{6,7})", text)
