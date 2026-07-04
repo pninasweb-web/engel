@@ -13,7 +13,7 @@ from tender import Tender
 from config import MR_GOV_BASE, MR_GOV_SEARCH_TERMS
 
 # כמה עמודי תוצאות לקרוא לכל מונח חיפוש (20 תוצאות בעמוד)
-PAGES_PER_TERM = 2
+PAGES_PER_TERM = 3
 
 
 def _search_page(term, page):
