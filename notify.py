@@ -28,7 +28,7 @@ def _detail_row(icon, label, value, color="#2b2b2b", bold=False):
     weight = "600" if bold else "normal"
     return (
         f'<tr><td style="padding:3px 0;color:#8a8a8a;font-size:13px;white-space:nowrap;'
-        f'vertical-align:top;width:104px;">{icon} {label}</td>'
+        f'vertical-align:top;width:120px;">{icon} {label}</td>'
         f'<td style="padding:3px 0;color:{color};font-weight:{weight};font-size:13px;">{value}</td></tr>'
     )
 
@@ -39,6 +39,9 @@ def _contact_html(t):
         bits.append(t.contact_name)
     if t.contact_phone:
         bits.append(f'<a href="tel:{t.contact_phone}" style="color:#2e8b57;text-decoration:none;">☎ {t.contact_phone}</a>')
+    elif t.contact_email or t.contact_name:
+        # יש פרטי קשר אך בלי טלפון — מציינים במפורש
+        bits.append('<span style="color:#a0a0a0;">☎ לא צוין טלפון</span>')
     if t.contact_email:
         bits.append(f'<a href="mailto:{t.contact_email}" style="color:#2e8b57;text-decoration:none;">✉ {t.contact_email}</a>')
     return " · ".join(bits)
@@ -59,7 +62,7 @@ def _card(t):
         _detail_row("📐", "שטח", f"{t.area} מ״ר" if t.area else ""),
         _detail_row("🧭", "גוש/חלקה", t.parcel),
         _detail_row("📅", "פורסם", t.open_date),
-        _detail_row("⏰", "מועד אחרון", t.close_date, color="#b23b2e", bold=True),
+        _detail_row("⏰", "מועד אחרון להגשה", t.close_date, color="#b23b2e", bold=True),
         _detail_row("🏷️", "מס׳ מכרז", t.number),
         _detail_row("🏛️", "מפרסם", t.publisher),
         _detail_row("📋", "תנאים", t.terms),
@@ -99,7 +102,7 @@ def _banner(subtitle, count_line):
     return f"""
     <div style="background:linear-gradient(135deg,#2e8b57,#3aa06a);background-color:#2e8b57;
                 border-radius:12px;padding:22px 24px;color:#fff;">
-      <div style="font-size:22px;font-weight:800;">🌾 מכרזים חקלאיים · משק אנג׳ל</div>
+      <div style="font-size:22px;font-weight:800;">🌾 מכרזים חקלאיים · אנגל</div>
       <div style="font-size:14px;opacity:.92;margin-top:4px;">{subtitle} · {today}</div>
       <div style="font-size:13px;opacity:.85;margin-top:8px;">{count_line}</div>
     </div>"""
@@ -147,14 +150,14 @@ def _send(subject, html, attach_path=None):
 
     msg = MIMEMultipart("mixed")
     msg["Subject"] = Header(subject, "utf-8")
-    msg["From"] = formataddr((str(Header("מכרזים · משק אנג׳ל", "utf-8")), user))
+    msg["From"] = formataddr((str(Header("מכרזים חקלאיים · אנגל", "utf-8")), user))
     msg["To"] = to_addr
     msg.attach(MIMEText(html, "html", "utf-8"))
 
     if attach_path and os.path.exists(attach_path):
         with open(attach_path, "rb") as f:
             part = MIMEApplication(f.read(), _subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        part.add_header("Content-Disposition", "attachment", filename="מכרזים-משק-אנגל.xlsx")
+        part.add_header("Content-Disposition", "attachment", filename="מכרזים-אנגל.xlsx")
         msg.attach(part)
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:

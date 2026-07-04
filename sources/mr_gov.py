@@ -116,8 +116,10 @@ def enrich_details(tender):
     tender.area = _grab(r"שטח עיסקה:\s*([\d,]+)", text)
     tender.parcel = _grab(r"בגוש חלקה ושיטת רישום\s*([^|]{3,60}?)(?:בישוב|במגרש|תכנית|$)", text)
 
-    # יצירת קשר
-    tender.contact_name = _grab(r"איש קשר:\s*([^\d]{2,40}?)\s*(?:דוא|טלפון|מייל|$)", text)
-    tender.contact_email = _grab(r"([\w.\-]+@[\w.\-]+\.\w{2,})", text)
-    # טלפון רק כשמסומן במפורש (אחרת יש רעש ממספרי תכנית)
-    tender.contact_phone = _grab(r"טלפון:?\s*(0\d[-\s]?\d{6,7})", text)
+    # יצירת קשר — מבודדים את בלוק "איש קשר" כדי לא לתפוס מספרי תכנית/גוש רועשים
+    block = _grab(r"(איש קשר:.{0,160}?)(?:מהות ההתקשרות|שטח עיסקה|$)", text) or text
+    tender.contact_name = _grab(r"איש קשר:\s*([^\d]{2,40}?)\s*(?:דוא|טלפון|מייל|$)", block)
+    tender.contact_email = _grab(r"([\w.\-]+@[\w.\-]+\.\w{2,})", block)
+    # טלפון: מסומן במפורש, או מספר טלפון תקין בתוך בלוק אנשי הקשר בלבד
+    tender.contact_phone = (_grab(r"טלפון:?\s*(0\d[-\s]?\d{6,7})", block)
+                            or _grab(r"\b(0\d{1,2}-?\d{7})\b", block))

@@ -48,7 +48,8 @@ def _month_key(t):
 
 
 def _contact(t):
-    return " · ".join(x for x in [t.contact_name, t.contact_phone, t.contact_email] if x)
+    phone = t.contact_phone or ("לא צוין טלפון" if (t.contact_email or t.contact_name) else "")
+    return " · ".join(x for x in [t.contact_name, phone, t.contact_email] if x)
 
 
 def build(tenders):
@@ -63,7 +64,7 @@ def build(tenders):
 
     # כותרת עליונה
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncols)
-    top = ws.cell(row=1, column=1, value="🌾  מכרזים חקלאיים · משק אנג׳ל · אזור עמק יזרעאל")
+    top = ws.cell(row=1, column=1, value="🌾  מכרזים חקלאיים · אנגל · אזור עמק יזרעאל")
     top.font = Font(bold=True, size=15, color=WHITE)
     top.fill = PatternFill("solid", fgColor=GREEN)
     top.alignment = Alignment(horizontal="right", vertical="center")
