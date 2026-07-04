@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-נקודת הכניסה. מריץ את כל המקורות, מסנן לפי נושא ואזור,
-זוכר מה כבר נשלח, ושולח מייל רק על מכרזים חדשים.
+נקודת הכניסה.
 
-הרצה מקומית לבדיקה (בלי לשלוח מייל ובלי לשמור מצב):
-    python3 main.py --dry-run
+מצבים:
+    python3 main.py               הרצה יומית: מוצא מכרזים, מעדכן מסד, שולח מייל
+                                   עם "חדשים" + "רלוונטיים השבוע" אם יש חדשים.
+    python3 main.py --weekly      מייל סיכום שבועי (כל מה שנמצא ב-7 הימים האחרונים).
+    python3 main.py --dry-run     כמו יומי אבל בלי לשלוח מייל ובלי לשמור מצב.
+    python3 main.py --preview     מרנדר את המייל היומי לקובץ email_preview.html.
+
+תמיד מתחדש קובץ הספרדשיט (tenders.xlsx) ממסד הנתונים.
 """
 import sys
 
@@ -12,85 +17,138 @@ import config
 import classify
 import state
 import notify
+import spreadsheet
+from tender import Tender
 from sources import councils, mr_gov
 
-# תקרת דפי-פרט לחילוץ בהרצה אחת (הגנה מפני הצפה). מספיק גבוה כדי
-# שההרצה הראשונה תכסה את כל המכרזים הפעילים; בהרצות הבאות ממילא יש מעט חדשים.
+# תקרת דפי-פרט לחילוץ בהרצה אחת (הגנה מפני הצפה)
 MAX_NEW_DETAIL = 250
 
 
-def collect_council_matches(seen, processed):
-    """מכרזים מהמועצות — כבר באזור בהגדרה, צריך רק סינון נושאי."""
-    matches = []
+# ---------------------------------------------------------------------------
+# איסוף מכרזים חקלאיים (כל הקבוצות — הסינון לתצוגה קורה בהמשך)
+# ---------------------------------------------------------------------------
+
+def collect_from_councils():
+    out = []
     for t in councils.scrape_all(config.COUNCILS):
-        if t.uid in seen:
-            continue
-        processed.add(t.uid)
         b = classify.bucket(f"{t.title} {t.terms}")
         if b:
             t.bucket = b
-            councils.enrich_match(t)   # השלמת יצירת קשר למכרז תואם
-            matches.append(t)
-    return matches
+            councils.enrich_match(t)
+            out.append(t)
+    return out
 
 
-def collect_mr_gov_matches(seen, processed):
-    """מכרזי רמ"י/משרד החקלאות — צריך גם סינון נושאי וגם גאוגרפי."""
-    matches = []
+def collect_from_mr_gov(mr_evaluated):
+    out = []
     candidates = mr_gov.search_candidates()
-    new = [t for t in candidates.values() if t.uid not in seen]
-    # החדשים קודם (מספר פרסום גבוה = חדש יותר), עם תקרה
-    new.sort(key=lambda t: t.uid, reverse=True)
-    capped = new[:MAX_NEW_DETAIL]
-    if len(new) > MAX_NEW_DETAIL:
-        print(f"  ⚠ {len(new)} מועמדים חדשים — מטפל ב-{MAX_NEW_DETAIL} הראשונים, השאר בהרצה הבאה")
+    fresh = [t for t in candidates.values() if t.uid not in mr_evaluated]
+    fresh.sort(key=lambda t: t.uid, reverse=True)
+    capped = fresh[:MAX_NEW_DETAIL]
+    if len(fresh) > MAX_NEW_DETAIL:
+        print(f"  ⚠ {len(fresh)} מועמדים חדשים — מטפל ב-{MAX_NEW_DETAIL}, השאר בהרצה הבאה")
 
     for t in capped:
-        processed.add(t.uid)
+        mr_evaluated.add(t.uid)          # נבדק — לא נמשוך שוב את דף הפרט
         mr_gov.enrich_details(t)
-        # סינון אזור לפי היישוב שחולץ + הכותרת (לא לפי טקסט הנכס הרחב,
-        # כדי לא לתפוס יישובים רחוקים שנכללים באותה עסקה)
         if not classify.in_region(f"{t.location} {t.title}"):
             continue
-        b = classify.bucket(f"{t.title} {t.location}") or "general"
-        t.bucket = b
-        matches.append(t)
-    return matches
+        t.bucket = classify.bucket(f"{t.title} {t.location}") or "general"
+        out.append(t)
+    return out
 
 
-def main(dry_run=False):
-    seen = state.load()
-    print(f"זיכרון: {len(seen)} מכרזים מוכרים")
-    processed = set()
+# ---------------------------------------------------------------------------
+# עזרי תצוגה
+# ---------------------------------------------------------------------------
+
+def _visible(tenders):
+    return [t for t in tenders if classify.is_visible(t.bucket, config.EMAIL_BUCKETS)]
+
+
+def _week_records(db_tenders):
+    """מכרזים שנמצאו ב-7 הימים האחרונים, לפי סדר יורד של תאריך גילוי."""
+    recs = [Tender.from_dict(r) for r in db_tenders.values()
+            if state.within_days(r.get("first_seen", ""), config.WEEK_DAYS)]
+    recs = _visible(recs)
+    recs.sort(key=lambda t: t.first_seen, reverse=True)
+    return recs
+
+
+# ---------------------------------------------------------------------------
+# מצב יומי
+# ---------------------------------------------------------------------------
+
+def run_daily(dry_run=False, preview=False):
+    db_tenders, mr_evaluated = state.load_db()
+    print(f"מסד נתונים: {len(db_tenders)} מכרזים מוכרים")
+    today = state.today_iso()
 
     print("סורק מועצות אזוריות…")
-    matches = collect_council_matches(seen, processed)
+    current = collect_from_councils()
     print("סורק מינהל הרכש (רמ״י / משרד החקלאות)…")
-    matches += collect_mr_gov_matches(seen, processed)
+    current += collect_from_mr_gov(mr_evaluated)
 
-    print(f"\nנמצאו {len(matches)} מכרזים חדשים ורלוונטיים.")
-    for t in matches:
-        print(f"  [{t.bucket}] {t.source} · {t.location or '—'} · {t.title[:70]}")
+    # מיזוג למסד: חדשים מקבלים first_seen=today; קיימים שומרים על התאריך המקורי
+    new_today = []
+    for t in current:
+        if t.uid in db_tenders:
+            t.first_seen = db_tenders[t.uid].get("first_seen", today)
+        else:
+            t.first_seen = today
+            new_today.append(t)
+        db_tenders[t.uid] = t.to_dict()
 
-    if "--preview" in sys.argv:
+    new_visible = _visible(new_today)
+    week_visible = _week_records(db_tenders)
+    new_uids = {t.uid for t in new_visible}
+    week_older = [t for t in week_visible if t.uid not in new_uids]
+
+    print(f"\nחדשים היום (מוצגים): {len(new_visible)} | רלוונטיים השבוע: {len(week_visible)}")
+    for t in new_visible:
+        print(f"  🆕 [{t.bucket}] {t.source} · {t.location or '—'} · {t.title[:60]}")
+
+    if preview:
         with open("email_preview.html", "w", encoding="utf-8") as f:
-            f.write(notify.build_html(matches))
-        print("\nנשמרה תצוגה מקדימה: email_preview.html (לא נשלח מייל ולא נשמר מצב)")
+            f.write(notify.build_daily(new_visible, week_older))
+        spreadsheet.build(_visible([Tender.from_dict(r) for r in db_tenders.values()]))
+        print("\nנשמרו: email_preview.html + tenders.xlsx (בלי שליחה/שמירת מצב)")
         return
 
     if dry_run:
         print("\n(dry-run: לא נשלח מייל ולא נשמר מצב)")
         return
 
-    if matches:
-        notify.send(matches)
+    # מייל נשלח רק כשיש מכרזים חדשים
+    if new_visible:
+        notify.send_daily(new_visible, week_older)
     else:
-        print("אין מכרזים חדשים — לא נשלח מייל.")
+        print("אין מכרזים חדשים היום — לא נשלח מייל.")
 
-    # מוסיפים לזיכרון את כל מה שטופל (גם מה שלא התאים) כדי לא לבדוק שוב
-    state.save(seen | processed)
-    print(f"זיכרון עודכן: {len(seen | processed)} מכרזים.")
+    state.save_db(db_tenders, mr_evaluated)
+    spreadsheet.build(_visible([Tender.from_dict(r) for r in db_tenders.values()]))
+    print(f"מסד עודכן: {len(db_tenders)} מכרזים · הספרדשיט חודש.")
+
+
+# ---------------------------------------------------------------------------
+# מצב שבועי
+# ---------------------------------------------------------------------------
+
+def run_weekly():
+    db_tenders, _ = state.load_db()
+    week = _week_records(db_tenders)
+    # מרעננים את הספרדשיט המצורף מכל הארכיון
+    spreadsheet.build(_visible([Tender.from_dict(r) for r in db_tenders.values()]))
+    print(f"סיכום שבועי: {len(week)} מכרזים רלוונטיים ב-7 הימים האחרונים")
+    if week:
+        notify.send_weekly(week)
+    else:
+        print("אין מכרזים רלוונטיים השבוע — לא נשלח סיכום.")
 
 
 if __name__ == "__main__":
-    main(dry_run="--dry-run" in sys.argv)
+    if "--weekly" in sys.argv:
+        run_weekly()
+    else:
+        run_daily(dry_run="--dry-run" in sys.argv, preview="--preview" in sys.argv)

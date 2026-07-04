@@ -1,0 +1,38 @@
+name: מכרזים חקלאיים — סיכום שבועי
+
+on:
+  schedule:
+    # כל יום ראשון ב-05:00 UTC (~08:00 בקיץ שעון ישראל)
+    - cron: "0 5 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  weekly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: התקנת תלויות
+        run: pip install -r requirements.txt
+
+      - name: שליחת סיכום שבועי + קובץ אקסל
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: python main.py --weekly
+
+      - name: שמירת האקסל המעודכן
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add tenders.xlsx
+          git diff --staged --quiet || git commit -m "עדכון אקסל שבועי [skip ci]"
+          git push

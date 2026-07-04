@@ -7,7 +7,7 @@ on:
   workflow_dispatch:   # מאפשר הרצה ידנית מכפתור ב-GitHub
 
 permissions:
-  contents: write       # כדי לשמור בחזרה את seen.json
+  contents: write       # כדי לשמור בחזרה את מסד הנתונים והאקסל
 
 jobs:
   run:
@@ -29,10 +29,10 @@ jobs:
           MAIL_TO: ${{ secrets.MAIL_TO }}
         run: python main.py
 
-      - name: שמירת זיכרון המכרזים
+      - name: שמירת מסד הנתונים והאקסל
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add seen.json
-          git diff --staged --quiet || git commit -m "עדכון זיכרון מכרזים [skip ci]"
+          git add data.json tenders.xlsx
+          git diff --staged --quiet || git commit -m "עדכון מכרזים [skip ci]"
           git push

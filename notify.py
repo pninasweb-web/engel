@@ -1,34 +1,35 @@
 # -*- coding: utf-8 -*-
-"""בניית מייל HTML מעוצב (RTL) ושליחתו דרך Gmail SMTP."""
+"""בניית מיילים מעוצבים (RTL) ושליחתם דרך Gmail SMTP."""
 import os
 import smtplib
 from datetime import datetime
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
 from email.header import Header
 from email.utils import formataddr
 
-# לכל קבוצה: אמוji, שם, צבע הדגשה, גוון רקע
-GROUP_TITLES = {
-    "wheat":   ("🌾", "חיטה / גד״ש", "#c9971c", "#fff8e6"),
-    "grazing": ("🐄", "מרעה בקר",    "#2e8b57", "#eaf6ef"),
-    "general": ("🌱", "חקלאי — כללי", "#5b8a3a", "#eef4e8"),
-}
-GROUP_ORDER = ["wheat", "grazing", "general"]
+# צבע הדגשה לכל קבוצה
+_ACCENT = {"wheat": "#c9971c", "both": "#c9971c",
+           "general": "#5b8a3a", "grazing": "#2e8b57"}
+_BUCKET_CHIP = {"wheat": ("🌾", "חיטה/גד״ש", "#fff8e6", "#c9971c"),
+                "both": ("🌾", "חיטה/גד״ש", "#fff8e6", "#c9971c"),
+                "general": ("🌱", "חקלאי", "#eef4e8", "#5b8a3a"),
+                "grazing": ("🐄", "מרעה", "#eaf6ef", "#2e8b57")}
 
 
-def _expand(bucket):
-    return ["wheat", "grazing"] if bucket == "both" else [bucket]
+def _accent(bucket):
+    return _ACCENT.get(bucket, "#5b8a3a")
 
 
-def _detail_row(icon, label, value):
+def _detail_row(icon, label, value, color="#2b2b2b", bold=False):
     if not value:
         return ""
+    weight = "600" if bold else "normal"
     return (
-        f'<tr>'
-        f'<td style="padding:3px 0;color:#8a8a8a;font-size:13px;white-space:nowrap;'
-        f'vertical-align:top;width:96px;">{icon} {label}</td>'
-        f'<td style="padding:3px 0;color:#2b2b2b;font-size:13px;">{value}</td>'
-        f'</tr>'
+        f'<tr><td style="padding:3px 0;color:#8a8a8a;font-size:13px;white-space:nowrap;'
+        f'vertical-align:top;width:104px;">{icon} {label}</td>'
+        f'<td style="padding:3px 0;color:{color};font-weight:{weight};font-size:13px;">{value}</td></tr>'
     )
 
 
@@ -43,17 +44,22 @@ def _contact_html(t):
     return " · ".join(bits)
 
 
-def _card_html(t, accent):
-    badge = (
-        f'<span style="background:#eee;color:#555;font-size:11px;padding:2px 8px;'
-        f'border-radius:10px;white-space:nowrap;">{t.ttype}</span>' if t.ttype else ""
-    )
+def _chip(bucket):
+    emoji, name, bg, fg = _BUCKET_CHIP.get(bucket, ("🌱", "חקלאי", "#eef4e8", "#5b8a3a"))
+    return (f'<span style="background:{bg};color:{fg};font-size:11px;font-weight:600;'
+            f'padding:2px 9px;border-radius:10px;white-space:nowrap;">{emoji} {name}</span>')
+
+
+def _card(t):
+    accent = _accent(t.bucket)
+    badge = (f'<span style="background:#eee;color:#555;font-size:11px;padding:2px 8px;'
+             f'border-radius:10px;white-space:nowrap;">{t.ttype}</span>' if t.ttype else "")
     rows = "".join([
         _detail_row("📍", "מיקום", t.location),
         _detail_row("📐", "שטח", f"{t.area} מ״ר" if t.area else ""),
         _detail_row("🧭", "גוש/חלקה", t.parcel),
         _detail_row("📅", "פורסם", t.open_date),
-        _detail_row("⏰", "מועד אחרון", t.close_date),
+        _detail_row("⏰", "מועד אחרון", t.close_date, color="#b23b2e", bold=True),
         _detail_row("🏷️", "מס׳ מכרז", t.number),
         _detail_row("🏛️", "מפרסם", t.publisher),
         _detail_row("📋", "תנאים", t.terms),
@@ -63,9 +69,9 @@ def _card_html(t, accent):
     <div style="background:#ffffff;border:1px solid #ececec;border-right:4px solid {accent};
                 border-radius:10px;padding:16px 18px;margin:0 0 14px;">
       <table style="width:100%;border-collapse:collapse;"><tr>
-        <td style="vertical-align:top;">
-          <a href="{t.url}" style="font-size:16px;font-weight:700;color:#1c1c1c;
-             text-decoration:none;line-height:1.35;">{t.title}</a>
+        <td style="vertical-align:top;">{_chip(t.bucket)}
+          <div style="margin-top:6px;"><a href="{t.url}" style="font-size:16px;font-weight:700;
+             color:#1c1c1c;text-decoration:none;line-height:1.35;">{t.title}</a></div>
         </td>
         <td style="vertical-align:top;text-align:left;white-space:nowrap;padding-right:8px;">{badge}</td>
       </tr></table>
@@ -76,69 +82,92 @@ def _card_html(t, accent):
     </div>"""
 
 
-def build_html(tenders):
-    groups = {g: [] for g in GROUP_ORDER}
-    for t in tenders:
-        for g in _expand(t.bucket):
-            groups[g].append(t)
+def _section(title, emoji, tenders, accent="#2e8b57"):
+    if not tenders:
+        return ""
+    cards = "".join(_card(t) for t in tenders)
+    return f"""
+      <div style="margin:28px 0 12px;border-bottom:2px solid {accent};padding-bottom:6px;">
+        <span style="font-size:19px;font-weight:800;color:{accent};">{emoji} {title}</span>
+        <span style="color:#aaa;font-weight:normal;font-size:15px;">({len(tenders)})</span>
+      </div>
+      {cards}"""
 
-    sections = []
-    for g in GROUP_ORDER:
-        items = groups[g]
-        if not items:
-            continue
-        emoji, name, accent, tint = GROUP_TITLES[g]
-        cards = "".join(_card_html(t, accent) for t in items)
-        sections.append(f"""
-        <div style="margin:26px 0 6px;">
-          <span style="background:{tint};color:{accent};font-size:16px;font-weight:700;
-                       padding:7px 16px;border-radius:20px;">
-            {emoji} {name} ({len(items)})
-          </span>
-        </div>
-        {cards}""")
 
+def _banner(subtitle, count_line):
     today = datetime.now().strftime("%d/%m/%Y")
-    return f"""<div dir="rtl" style="background:#f4f6f4;padding:22px 0;margin:0;
-         font-family:'Segoe UI',Arial,Helvetica,sans-serif;">
-  <div style="max-width:640px;margin:0 auto;">
-
+    return f"""
     <div style="background:linear-gradient(135deg,#2e8b57,#3aa06a);background-color:#2e8b57;
                 border-radius:12px;padding:22px 24px;color:#fff;">
-      <div style="font-size:22px;font-weight:800;">🌾 מכרזים חקלאיים חדשים</div>
-      <div style="font-size:14px;opacity:.92;margin-top:4px;">
-        משק אנג׳ל · אזור עמק יזרעאל · {today}
-      </div>
-      <div style="font-size:13px;opacity:.85;margin-top:8px;">
-        נמצאו {len(tenders)} מכרזים חדשים ורלוונטיים.
-      </div>
-    </div>
+      <div style="font-size:22px;font-weight:800;">🌾 מכרזים חקלאיים · משק אנג׳ל</div>
+      <div style="font-size:14px;opacity:.92;margin-top:4px;">{subtitle} · {today}</div>
+      <div style="font-size:13px;opacity:.85;margin-top:8px;">{count_line}</div>
+    </div>"""
 
-    {''.join(sections)}
 
-    <div style="color:#9aa39a;font-size:12px;margin-top:24px;padding:14px 6px;
+_FOOTER = """
+    <div style="color:#9aa39a;font-size:12px;margin-top:26px;padding:14px 6px;
                 border-top:1px solid #e2e6e2;line-height:1.6;">
-      התראה אוטומטית יומית · מקורות: מועצות אזוריות עמק יזרעאל / גלבוע / מגידו +
+      התראה אוטומטית · מקורות: מועצות אזוריות עמק יזרעאל / גלבוע / מגידו +
       מינהל הרכש הממשלתי (רמ״י, משרד החקלאות, רשות הטבע והגנים).<br>
       הנתונים מחולצים אוטומטית — יש לוודא פרטים סופיים בקישור למכרז המקורי.
-    </div>
-
-  </div>
-</div>"""
+    </div>"""
 
 
-def send(tenders):
+def _wrap(inner):
+    return f"""<div dir="rtl" style="background:#f4f6f4;padding:22px 14px;margin:0;
+         font-family:'Segoe UI',Arial,Helvetica,sans-serif;">
+  <div style="max-width:600px;margin:0 auto;">{inner}</div></div>"""
+
+
+def build_daily(new_tenders, week_tenders):
+    banner = _banner("מכרזים חקלאיים חדשים",
+                     f"{len(new_tenders)} מכרזים חדשים היום · {len(week_tenders)} נוספים רלוונטיים השבוע")
+    body = (_section("מכרזים חדשים", "🆕", new_tenders, "#2e8b57")
+            + _section("מכרזים רלוונטיים השבוע", "📆", week_tenders, "#5b8a3a"))
+    return _wrap(banner + body + _FOOTER)
+
+
+def build_weekly(week_tenders):
+    banner = _banner("סיכום שבועי", f"{len(week_tenders)} מכרזים רלוונטיים ב-7 הימים האחרונים")
+    body = _section("מכרזים רלוונטיים השבוע", "📆", week_tenders, "#2e8b57")
+    note = ('<div style="color:#5b8a3a;font-size:13px;margin-top:6px;">📎 מצורף קובץ '
+            'אקסל מעוצב עם כל המכרזים מסודרים לפי חודשים.</div>')
+    return _wrap(banner + body + note + _FOOTER)
+
+
+# ---------------------------------------------------------------------------
+# שליחה
+# ---------------------------------------------------------------------------
+
+def _send(subject, html, attach_path=None):
     user = os.environ["SMTP_USER"]
     password = os.environ["SMTP_APP_PASSWORD"]
     to_addr = os.environ.get("MAIL_TO", user)
 
-    html = build_html(tenders)
-    msg = MIMEText(html, "html", "utf-8")
-    msg["Subject"] = Header(f"🌾 {len(tenders)} מכרזים חקלאיים חדשים באזור עמק יזרעאל", "utf-8")
+    msg = MIMEMultipart("mixed")
+    msg["Subject"] = Header(subject, "utf-8")
     msg["From"] = formataddr((str(Header("מכרזים · משק אנג׳ל", "utf-8")), user))
     msg["To"] = to_addr
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    if attach_path and os.path.exists(attach_path):
+        with open(attach_path, "rb") as f:
+            part = MIMEApplication(f.read(), _subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        part.add_header("Content-Disposition", "attachment", filename="מכרזים-משק-אנגל.xlsx")
+        msg.attach(part)
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(user, password)
         server.sendmail(user, [a.strip() for a in to_addr.split(",")], msg.as_string())
     print(f"  ✉  נשלח מייל ל-{to_addr}")
+
+
+def send_daily(new_tenders, week_tenders):
+    _send(f"🌾 {len(new_tenders)} מכרזים חקלאיים חדשים באזור עמק יזרעאל",
+          build_daily(new_tenders, week_tenders))
+
+
+def send_weekly(week_tenders, attach_path="tenders.xlsx"):
+    _send(f"🌾 סיכום שבועי · {len(week_tenders)} מכרזים חקלאיים רלוונטיים",
+          build_weekly(week_tenders), attach_path=attach_path)

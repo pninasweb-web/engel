@@ -48,3 +48,13 @@ def bucket(text):
 def in_region(text):
     """האם הטקסט מזכיר יישוב/אזור ברדיוס הרלוונטי (התאמת מילה שלמה)."""
     return _has_any(text, REGION_SETTLEMENTS)
+
+
+def expand_bucket(bucket):
+    """'both' = חיטה וגם מרעה."""
+    return ["wheat", "grazing"] if bucket == "both" else [bucket]
+
+
+def is_visible(bucket, email_buckets):
+    """האם הקבוצה נכללת בתצוגה לפי ההגדרה (EMAIL_BUCKETS)."""
+    return bool(set(expand_bucket(bucket)) & set(email_buckets))
