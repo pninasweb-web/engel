@@ -9,6 +9,8 @@ from email.mime.application import MIMEApplication
 from email.header import Header
 from email.utils import formataddr
 
+import config
+
 # צבע הדגשה לכל קבוצה
 _ACCENT = {"wheat": "#c9971c", "both": "#c9971c",
            "general": "#5b8a3a", "grazing": "#2e8b57"}
@@ -102,7 +104,7 @@ def _banner(subtitle, count_line):
     return f"""
     <div style="background:linear-gradient(135deg,#2e8b57,#3aa06a);background-color:#2e8b57;
                 border-radius:12px;padding:22px 24px;color:#fff;">
-      <div style="font-size:22px;font-weight:800;">🌾 מכרזים חקלאיים · אנגל</div>
+      <div style="font-size:22px;font-weight:800;">מכרזים חקלאיים · אנגל</div>
       <div style="font-size:14px;opacity:.92;margin-top:4px;">{subtitle} · {today}</div>
       <div style="font-size:13px;opacity:.85;margin-top:8px;">{count_line}</div>
     </div>"""
@@ -117,6 +119,25 @@ _FOOTER = """
     </div>"""
 
 
+def _spreadsheet_block():
+    """קישור + הסבר על קובץ האקסל המצטבר (הקובץ עצמו מצורף למייל)."""
+    link = ""
+    if config.SPREADSHEET_URL:
+        link = (f'<a href="{config.SPREADSHEET_URL}" style="display:inline-block;'
+                f'background:#1f6b3b;color:#fff;font-size:13px;font-weight:600;'
+                f'text-decoration:none;padding:9px 18px;border-radius:6px;margin-top:8px;">'
+                f'📊 לצפייה בקובץ כל המכרזים ←</a>')
+    return f"""
+      <div style="background:#eef4e8;border:1px solid #d8e6cf;border-radius:10px;
+                  padding:14px 18px;margin:22px 0 4px;">
+        <div style="font-size:14px;font-weight:700;color:#2e6b3b;">📎 קובץ ריכוז כל המכרזים</div>
+        <div style="font-size:13px;color:#4a5a48;margin-top:3px;">
+          מצורף למייל קובץ אקסל מעוצב עם כל המכרזים, מסודרים לפי חודשים.
+        </div>
+        {link}
+      </div>"""
+
+
 def _wrap(inner):
     return f"""<div dir="rtl" style="background:#f4f6f4;padding:22px 14px;margin:0;
          font-family:'Segoe UI',Arial,Helvetica,sans-serif;">
@@ -128,15 +149,13 @@ def build_daily(new_tenders, week_tenders):
                      f"{len(new_tenders)} מכרזים חדשים היום · {len(week_tenders)} נוספים רלוונטיים השבוע")
     body = (_section("מכרזים חדשים", "🆕", new_tenders, "#2e8b57")
             + _section("מכרזים רלוונטיים השבוע", "📆", week_tenders, "#5b8a3a"))
-    return _wrap(banner + body + _FOOTER)
+    return _wrap(banner + body + _spreadsheet_block() + _FOOTER)
 
 
 def build_weekly(week_tenders):
     banner = _banner("סיכום שבועי", f"{len(week_tenders)} מכרזים רלוונטיים ב-7 הימים האחרונים")
     body = _section("מכרזים רלוונטיים השבוע", "📆", week_tenders, "#2e8b57")
-    note = ('<div style="color:#5b8a3a;font-size:13px;margin-top:6px;">📎 מצורף קובץ '
-            'אקסל מעוצב עם כל המכרזים מסודרים לפי חודשים.</div>')
-    return _wrap(banner + body + note + _FOOTER)
+    return _wrap(banner + body + _spreadsheet_block() + _FOOTER)
 
 
 # ---------------------------------------------------------------------------
@@ -166,11 +185,11 @@ def _send(subject, html, attach_path=None):
     print(f"  ✉  נשלח מייל ל-{to_addr}")
 
 
-def send_daily(new_tenders, week_tenders):
-    _send(f"🌾 {len(new_tenders)} מכרזים חקלאיים חדשים באזור עמק יזרעאל",
-          build_daily(new_tenders, week_tenders))
+def send_daily(new_tenders, week_tenders, attach_path="tenders.xlsx"):
+    _send(f"{len(new_tenders)} מכרזים חקלאיים חדשים באזור עמק יזרעאל",
+          build_daily(new_tenders, week_tenders), attach_path=attach_path)
 
 
 def send_weekly(week_tenders, attach_path="tenders.xlsx"):
-    _send(f"🌾 סיכום שבועי · {len(week_tenders)} מכרזים חקלאיים רלוונטיים",
+    _send(f"סיכום שבועי · {len(week_tenders)} מכרזים חקלאיים רלוונטיים",
           build_weekly(week_tenders), attach_path=attach_path)

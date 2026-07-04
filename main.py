@@ -120,6 +120,9 @@ def run_daily(dry_run=False, preview=False):
         print("\n(dry-run: לא נשלח מייל ולא נשמר מצב)")
         return
 
+    # בונים קודם את הספרדשיט כדי שהקובץ המצורף למייל יהיה מעודכן
+    spreadsheet.build(_visible([Tender.from_dict(r) for r in db_tenders.values()]))
+
     # מייל נשלח רק כשיש מכרזים חדשים
     if new_visible:
         notify.send_daily(new_visible, week_older)
@@ -127,7 +130,6 @@ def run_daily(dry_run=False, preview=False):
         print("אין מכרזים חדשים היום — לא נשלח מייל.")
 
     state.save_db(db_tenders, mr_evaluated)
-    spreadsheet.build(_visible([Tender.from_dict(r) for r in db_tenders.values()]))
     print(f"מסד עודכן: {len(db_tenders)} מכרזים · הספרדשיט חודש.")
 
 
