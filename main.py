@@ -18,6 +18,7 @@ import classify
 import state
 import notify
 import spreadsheet
+import sheets
 from tender import Tender
 from sources import councils, mr_gov
 
@@ -120,8 +121,10 @@ def run_daily(dry_run=False, preview=False):
         print("\n(dry-run: לא נשלח מייל ולא נשמר מצב)")
         return
 
-    # בונים קודם את הספרדשיט כדי שהקובץ המצורף למייל יהיה מעודכן
-    spreadsheet.build(_visible([Tender.from_dict(r) for r in db_tenders.values()]))
+    # בונים את הספרדשיט (לצירוף) ומעדכנים את הגיליון החי בגוגל
+    all_visible = _visible([Tender.from_dict(r) for r in db_tenders.values()])
+    spreadsheet.build(all_visible)
+    sheets.push(all_visible)
 
     # מייל נשלח רק כשיש מכרזים חדשים
     if new_visible:
@@ -140,8 +143,10 @@ def run_daily(dry_run=False, preview=False):
 def run_weekly():
     db_tenders, _ = state.load_db()
     week = _week_records(db_tenders)
-    # מרעננים את הספרדשיט המצורף מכל הארכיון
-    spreadsheet.build(_visible([Tender.from_dict(r) for r in db_tenders.values()]))
+    # מרעננים את הספרדשיט המצורף ואת הגיליון החי מכל הארכיון
+    all_visible = _visible([Tender.from_dict(r) for r in db_tenders.values()])
+    spreadsheet.build(all_visible)
+    sheets.push(all_visible)
     print(f"סיכום שבועי: {len(week)} מכרזים רלוונטיים ב-7 הימים האחרונים")
     if week:
         notify.send_weekly(week)
