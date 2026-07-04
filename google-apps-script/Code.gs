@@ -2,13 +2,15 @@
  * מקבל את המכרזים מהמערכת ומצייר אותם יפה בגיליון, מסודרים לפי חודשים.
  * להדביק ב: הגיליון → Extensions → Apps Script → להחליף את כל התוכן בזה.
  * הסיסמה כבר מוטמעת — אין צורך לשנות כלום, רק להדביק ולפרוס (Deploy).
+ *
+ * עמודת "נוצר קשר?" היא תיבת סימון — הסימונים נשמרים בין עדכונים (לפי המכרז).
  */
-const SECRET = 'engel-bee6778b46e5';   // סיסמת אימות (מוטמעת מראש — אין צורך לשנות)
+const SECRET = 'engel-bee6778b46e5';
 
 const GREEN = '#2E8B57', GOLD = '#C9971C';
-const HEADERS = ['מכרז', 'סוג המכרז', 'מיקום', 'שטח (מ״ר)', 'תאריך פרסום',
-                 'מועד אחרון להגשה', 'מפרסם', 'פרטי קשר', 'קישור'];
-const WIDTHS = [320, 110, 110, 90, 105, 120, 150, 220, 90];
+const HEADERS = ['נוצר קשר?', 'מכרז', 'סוג המכרז', 'מיקום', 'שטח (מ״ר)',
+                 'תאריך פרסום', 'מועד אחרון להגשה', 'מפרסם', 'פרטי קשר', 'קישור'];
+const WIDTHS = [95, 300, 110, 110, 90, 105, 120, 150, 220, 90];
 
 function doPost(e) {
   try {
@@ -25,9 +27,25 @@ function doPost(e) {
 
 function render(rows) {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
-  sh.clear();
-  sh.setRightToLeft(true);
   const NC = HEADERS.length;
+
+  // 1) שמירת מצב הסימון הקיים ("נוצר קשר?") לפי קישור המכרז
+  const prev = {};
+  const lr = sh.getLastRow(), lc = sh.getLastColumn();
+  if (lr >= 1 && lc >= 2) {
+    const vals = sh.getRange(1, 1, lr, lc).getValues();
+    const forms = sh.getRange(1, 1, lr, lc).getFormulas();
+    for (let i = 0; i < vals.length; i++) {
+      const m = String(forms[i][1] || '').match(/HYPERLINK\("([^"]+)"/);
+      if (m) prev[m[1]] = (vals[i][0] === true);
+    }
+  }
+
+  // 2) ניקוי מלא (כולל תיבות סימון) והגדרת RTL ורוחב עמודות
+  sh.clearContents();
+  sh.clearFormats();
+  sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns()).clearDataValidations();
+  sh.setRightToLeft(true);
   WIDTHS.forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
 
   // כותרת עליונה
@@ -53,23 +71,31 @@ function render(rows) {
       r++;
       sh.getRange(r, 1, 1, NC).setValues([HEADERS])
         .setBackground(GREEN).setFontColor('#ffffff').setFontWeight('bold')
-        .setHorizontalAlignment('center');
+        .setHorizontalAlignment('center').setWrap(true);
       r++;
     }
+
     sh.getRange(r, 1, 1, NC).setValues([[
-      row.title, row.ttype, row.location, row.area, row.open_date,
-      row.close_date, row.publisher, row.contact, ''
+      '', row.title, row.ttype, row.location, row.area,
+      row.open_date, row.close_date, row.publisher, row.contact, ''
     ]]).setVerticalAlignment('top').setWrap(true);
 
+    // תיבת סימון "נוצר קשר?" + שחזור מצב קודם
+    const box = sh.getRange(r, 1);
+    box.insertCheckboxes();
+    box.setHorizontalAlignment('center');
+    if (row.url && prev[row.url]) box.setValue(true);
+
+    // קישורים לחיצים
     if (row.url) {
       const title = String(row.title).replace(/"/g, '""');
-      sh.getRange(r, 1).setFormula('=HYPERLINK("' + row.url + '","' + title + '")')
+      sh.getRange(r, 2).setFormula('=HYPERLINK("' + row.url + '","' + title + '")')
         .setFontColor('#1155CC');
       sh.getRange(r, NC).setFormula('=HYPERLINK("' + row.url + '","פתיחה ↗")')
         .setFontColor('#1155CC');
     }
     if (row.close_date) {
-      sh.getRange(r, 6).setFontColor('#B23B2E').setFontWeight('bold');
+      sh.getRange(r, 7).setFontColor('#B23B2E').setFontWeight('bold');
     }
     r++;
   });
