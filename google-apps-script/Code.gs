@@ -29,9 +29,10 @@ function render(rows) {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
   const NC = HEADERS.length;
 
-  // 1) שמירת מצב הסימון הקיים ("נוצר קשר?") לפי קישור המכרז
+  // 1) שמירת מצב הסימון הקיים ("נוצר קשר?") + הפונט שהמשתמשת בחרה
   const prev = {};
   const lr = sh.getLastRow(), lc = sh.getLastColumn();
+  const userFont = (lr >= 3) ? sh.getRange(lr, 2).getFontFamily() : '';
   if (lr >= 1 && lc >= 2) {
     const vals = sh.getRange(1, 1, lr, lc).getValues();
     const forms = sh.getRange(1, 1, lr, lc).getFormulas();
@@ -99,4 +100,9 @@ function render(rows) {
     }
     r++;
   });
+
+  // שחזור הפונט שהמשתמשת בחרה (כדי שלא יאופס בעדכון)
+  if (userFont) {
+    sh.getRange(1, 1, sh.getLastRow(), NC).setFontFamily(userFont);
+  }
 }
