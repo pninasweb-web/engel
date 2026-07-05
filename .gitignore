@@ -5,3 +5,5 @@ __pycache__/
 
 # תצוגה מקדימה שנוצרת מקומית
 email_preview.html
+
+thorough_scan.py

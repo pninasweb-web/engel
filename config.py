@@ -46,7 +46,8 @@ WEEK_DAYS = 7
 
 # מכרז שפורסם לפני יותר מהמספר הזה של ימים נחשב לא רלוונטי (כנראה נסגר).
 # בנוסף, מכרז שמועד ההגשה שלו כבר עבר — מוסתר אוטומטית.
-MAX_AGE_DAYS = 60
+# 210 ≈ כל השנה הנוכחית + החודשים האחרונים (לא כולל זבל מ-2023).
+MAX_AGE_DAYS = 210
 
 # קישור לגיליון Google החי (הכפתור "לצפייה בקובץ כל המכרזים" במייל).
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1ypYug7w3Hy3DGZ2GySCbu9fMq9s1s6o8GcFzG57YyEg/edit"
