@@ -120,21 +120,20 @@ _FOOTER = """
 
 
 def _spreadsheet_block():
-    """קישור + הסבר על קובץ האקסל המצטבר (הקובץ עצמו מצורף למייל)."""
-    link = ""
-    if config.SPREADSHEET_URL:
-        link = (f'<a href="{config.SPREADSHEET_URL}" style="display:inline-block;'
-                f'background:#1f6b3b;color:#fff;font-size:13px;font-weight:600;'
-                f'text-decoration:none;padding:9px 18px;border-radius:6px;margin-top:8px;">'
-                f'📊 לצפייה בקובץ כל המכרזים ←</a>')
+    """קישור לגיליון Google החי (בלי צירוף קובץ)."""
+    if not config.SPREADSHEET_URL:
+        return ""
     return f"""
       <div style="background:#eef4e8;border:1px solid #d8e6cf;border-radius:10px;
                   padding:14px 18px;margin:22px 0 4px;">
-        <div style="font-size:14px;font-weight:700;color:#2e6b3b;">📎 קובץ ריכוז כל המכרזים</div>
+        <div style="font-size:14px;font-weight:700;color:#2e6b3b;">📊 ריכוז כל המכרזים</div>
         <div style="font-size:13px;color:#4a5a48;margin-top:3px;">
-          מצורף למייל קובץ אקסל מעוצב עם כל המכרזים, מסודרים לפי חודשים.
+          כל המכרזים הרלוונטיים, מסודרים לפי חודשים ומתעדכנים אוטומטית:
         </div>
-        {link}
+        <a href="{config.SPREADSHEET_URL}" style="display:inline-block;
+           background:#1f6b3b;color:#fff;font-size:13px;font-weight:600;
+           text-decoration:none;padding:9px 18px;border-radius:6px;margin-top:8px;">
+           לצפייה בגיליון המלא ←</a>
       </div>"""
 
 
@@ -185,11 +184,11 @@ def _send(subject, html, attach_path=None):
     print(f"  ✉  נשלח מייל ל-{to_addr}")
 
 
-def send_daily(new_tenders, week_tenders, attach_path="tenders.xlsx"):
+def send_daily(new_tenders, week_tenders):
     _send(f"{len(new_tenders)} מכרזים חקלאיים חדשים באזור עמק יזרעאל",
-          build_daily(new_tenders, week_tenders), attach_path=attach_path)
+          build_daily(new_tenders, week_tenders))
 
 
-def send_weekly(week_tenders, attach_path="tenders.xlsx"):
+def send_weekly(week_tenders):
     _send(f"סיכום שבועי · {len(week_tenders)} מכרזים חקלאיים רלוונטיים",
-          build_weekly(week_tenders), attach_path=attach_path)
+          build_weekly(week_tenders))

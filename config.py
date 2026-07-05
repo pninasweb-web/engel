@@ -44,6 +44,10 @@ EMAIL_BUCKETS = ["wheat", "general"]
 # כמה ימים אחורה נחשב "רלוונטי השבוע"
 WEEK_DAYS = 7
 
+# מכרז שפורסם לפני יותר מהמספר הזה של ימים נחשב לא רלוונטי (כנראה נסגר).
+# בנוסף, מכרז שמועד ההגשה שלו כבר עבר — מוסתר אוטומטית.
+MAX_AGE_DAYS = 60
+
 # קישור לגיליון Google החי (הכפתור "לצפייה בקובץ כל המכרזים" במייל).
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1ypYug7w3Hy3DGZ2GySCbu9fMq9s1s6o8GcFzG57YyEg/edit"
 

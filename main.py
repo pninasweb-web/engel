@@ -64,8 +64,31 @@ def collect_from_mr_gov(mr_evaluated):
 # עזרי תצוגה
 # ---------------------------------------------------------------------------
 
+def _fresh(t):
+    """מכרז רלוונטי: מועד ההגשה לא עבר, ופורסם לא מזמן (MAX_AGE_DAYS)."""
+    from datetime import date, timedelta
+    import re
+    def parse(s):
+        m = re.match(r"(\d{2})/(\d{2})/(\d{4})", s or "")
+        if not m:
+            return None
+        try:
+            return date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+        except ValueError:
+            return None
+    today = date.today()
+    close = parse(t.close_date)
+    if close and close < today:            # מועד ההגשה עבר
+        return False
+    published = parse(t.open_date)
+    if published and published < today - timedelta(days=config.MAX_AGE_DAYS):
+        return False                        # ישן מדי — כנראה נסגר
+    return True
+
+
 def _visible(tenders):
-    return [t for t in tenders if classify.is_visible(t.bucket, config.EMAIL_BUCKETS)]
+    return [t for t in tenders
+            if classify.is_visible(t.bucket, config.EMAIL_BUCKETS) and _fresh(t)]
 
 
 def _week_records(db_tenders):
