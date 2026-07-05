@@ -159,6 +159,26 @@
    "contact_phone": "",
    "bucket": "general",
    "first_seen": "2026-07-05"
+  },
+  "mr:4000599776": {
+   "uid": "mr:4000599776",
+   "source": "רמ״י / מינהל הרכש",
+   "title": "גידולי שדה בעל",
+   "url": "https://mr.gov.il/ilgstorefront/he/p/4000599776",
+   "publisher": "רשות מקרקעי ישראל",
+   "ttype": "פטור",
+   "number": "",
+   "open_date": "26/02/2025",
+   "close_date": "",
+   "location": "בית שאן",
+   "area": "77449",
+   "parcel": "",
+   "terms": "השכרות עונתיות",
+   "contact_name": "נתנאל ירדן",
+   "contact_email": "netanely@land.gov.il",
+   "contact_phone": "",
+   "bucket": "wheat",
+   "first_seen": "2026-07-05"
   }
  },
  "mr_evaluated": [
@@ -501,5 +521,5 @@
   "mr:650677",
   "mr:653008"
  ],
- "updated": "2026-07-05 09:52"
+ "updated": "2026-07-05 14:09"
 }
