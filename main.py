@@ -153,7 +153,7 @@ def run_daily(dry_run=False, preview=False):
     if new_visible:
         notify.send_daily(new_visible, week_older)
     else:
-        print("אין מכרזים חדשים היום — לא נשלח מייל.")
+        notify.send_no_news(week_visible)   # מייל עדכון גם כשאין חדשים
 
     state.save_db(db_tenders, mr_evaluated)
     print(f"מסד עודכן: {len(db_tenders)} מכרזים · הספרדשיט חודש.")

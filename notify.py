@@ -185,6 +185,21 @@ def _send(subject, html, attach_path=None):
     print(f"  ✉  נשלח מייל ל-{to_addr}")
 
 
+def build_no_news(week_tenders):
+    banner = _banner("סריקה יומית", "לא נמצאו מכרזים חדשים היום")
+    msg = ('<div style="background:#fff;border:1px solid #ececec;border-radius:10px;'
+           'padding:16px 18px;margin:18px 0 4px;font-size:14px;color:#444;">'
+           'לא נמצאו מכרזים חקלאיים חדשים באזור היום. המערכת תמשיך לסרוק כל בוקר '
+           'ותעדכן ברגע שיופיע מכרז רלוונטי.</div>')
+    body = _section("מכרזים רלוונטיים פעילים", "📆", week_tenders, "#5b8a3a")
+    return _wrap(banner + msg + body + _spreadsheet_block() + _FOOTER)
+
+
+def send_no_news(week_tenders):
+    _send("סריקה יומית · לא נמצאו מכרזים חדשים באזור",
+          build_no_news(week_tenders))
+
+
 def send_daily(new_tenders, week_tenders):
     _send(f"{len(new_tenders)} מכרזים חקלאיים חדשים באזור עמק יזרעאל",
           build_daily(new_tenders, week_tenders))
