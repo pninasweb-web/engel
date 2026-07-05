@@ -17,7 +17,9 @@ PAGES_PER_TERM = 3
 
 
 def _search_page(term, page):
-    q = quote(f"{term}:relevance:archive:false")
+    # מיון לפי תאריך עדכון (החדשים ביותר קודם) — כדי לתפוס מכרזים טריים
+    # ולא הודעות ישנות מלפני שנים.
+    q = quote(f"{term}:updateDate:archive:false")
     url = f"{MR_GOV_BASE}/ilgstorefront/he/search/?q={q}&page={page}"
     return get_html(url)
 
