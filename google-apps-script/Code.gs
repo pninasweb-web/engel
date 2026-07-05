@@ -53,7 +53,7 @@ function render(rows) {
         .setBackground(GREEN).setFontColor('#fff').setFontWeight('bold').setHorizontalAlignment('center').setWrap(true); r++;
     }
     n++;
-    sh.getRange(r,1,1,NC).setValues([[n,row.title,row.ttype,row.location,row.area,row.open_date,row.close_date,row.publisher,row.contact,'','','']])
+    sh.getRange(r,1,1,NC).setValues([[n,row.title,row.ttype,row.location,row.area,row.open_date,(row.close_date||'לא צוין'),row.publisher,row.contact,'','','']])
       .setVerticalAlignment('top').setWrap(true);
     sh.getRange(r,1).setHorizontalAlignment('center');
     const c=sh.getRange(r,11); c.insertCheckboxes(); c.setHorizontalAlignment('center');
@@ -65,6 +65,7 @@ function render(rows) {
       if (prev[row.url]){ if(prev[row.url].contact) c.setValue(true); if(prev[row.url].sent) s.setValue(true); }
     }
     if (row.close_date) sh.getRange(r,7).setFontColor('#B23B2E').setFontWeight('bold');
+    else sh.getRange(r,7).setFontColor('#999999');
     r++;
   });
   sh.getRange(1,1,sh.getLastRow(),NC).setFontFamily(FONT);
